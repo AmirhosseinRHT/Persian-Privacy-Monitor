@@ -11,8 +11,14 @@ from readability import Document
 from playwright.async_api import async_playwright
 
 
-def sanitize_filename(url: str) -> str:
+KEYWORDS = [
+    "privacy", "cookie", "data", "policy", "terms",
+    "حریم خصوصی", "کوکی", "اطلاعات", "سیاست", "قوانین"
+]
 
+
+
+def sanitize_filename(url: str) -> str:
     """Make a safe filename from URL domain."""
     url = url.replace("http://", "").replace("https://", "")
     safe = url.replace(".", "-").replace(":", "").replace("/", "-")
@@ -31,19 +37,22 @@ def get_output_paths(url: str, out_dir: str):
         Path(out_dir) / f"{safe_name}_{ts}.txt",
     )
 
+
 def extract_blocks(html: str, min_line_length: int = 10) -> str:
+    """Extract relevant text blocks and filter by keywords if present."""
     soup = BeautifulSoup(html, "html.parser")
     texts = []
 
     for tag in soup.find_all(["p", "li", "h1", "h2", "h3"]):
         txt = re.sub(r"\s+", " ", tag.get_text(strip=True))
         if len(txt) >= min_line_length:
-            texts.append(txt)
+            if any(kw.lower() in txt.lower() for kw in KEYWORDS):
+                texts.append(txt)
 
     return "\n".join(texts)
 
 
-def scrape_with_requests(url: str, min_line_length: int = 10):
+def scrape_with_requests(url: str, min_line_length: int = 10000):
     try:
         resp = requests.get(url, timeout=20, headers={"User-Agent": "Mozilla/5.0"})
         resp.raise_for_status()
@@ -56,7 +65,7 @@ def scrape_with_requests(url: str, min_line_length: int = 10):
         return None, None
 
 
-async def scrape_with_playwright(url: str, pw, min_line_length: int = 10):
+async def scrape_with_playwright(url: str, pw, min_line_length: int = 10000):
     browser = await pw.chromium.launch(headless=True)
     page = await browser.new_page()
     try:
@@ -71,13 +80,12 @@ async def scrape_with_playwright(url: str, pw, min_line_length: int = 10):
         await browser.close()
 
 
-
-async def process_url(url: str, out_dir: str, pw):
+async def process_url(url: str, out_dir: str, pw, min_line_length: int):
     """Process a single URL with requests first, then Playwright fallback."""
-    html, text = scrape_with_requests(url)
+    html, text = scrape_with_requests(url, min_line_length)
 
     if not html or not text:
-        html, text = await scrape_with_playwright(url, pw)
+        html, text = await scrape_with_playwright(url, pw, min_line_length)
 
     if html and text:
         html_path, txt_path = get_output_paths(url, out_dir)
@@ -88,7 +96,7 @@ async def process_url(url: str, out_dir: str, pw):
         print(f"[FAIL] Could not scrape {url}")
 
 
-async def scrape_all(urls, out_dir: str, parallel: int):
+async def scrape_all(urls, out_dir: str, parallel: int, min_line_length: int):
     """Scrape all URLs in parallel with Playwright."""
     sem = asyncio.Semaphore(parallel)
 
@@ -96,7 +104,7 @@ async def scrape_all(urls, out_dir: str, parallel: int):
 
         async def bound_process(u):
             async with sem:
-                await process_url(u.strip(), out_dir, pw)
+                await process_url(u.strip(), out_dir, pw, min_line_length)
 
         tasks = [bound_process(u) for u in urls if u.strip()]
         await asyncio.gather(*tasks)
@@ -108,6 +116,12 @@ def main():
     parser.add_argument("--out", type=str, default="result", help="Output directory")
     parser.add_argument(
         "--parallel", type=int, default=3, help="Number of concurrent browsers"
+    )
+    parser.add_argument(
+        "--min-length",
+        type=int,
+        default=10000,
+        help="Minimum character length per text block",
     )
     parser.add_argument(
         "--debug", action="store_true", help="Run static debug example instead of file"
@@ -123,7 +137,7 @@ def main():
         with open(args.input, "r", encoding="utf-8") as f:
             urls = f.readlines()
 
-    asyncio.run(scrape_all(urls, args.out, args.parallel))
+    asyncio.run(scrape_all(urls, args.out, args.parallel, args.min_length))
 
 
 if __name__ == "__main__":
