@@ -7,7 +7,7 @@ __pycache__/
 .vscode/*
 
 # output
-scraped/*
+scraper/result/*
 
 # C extensions
 *.so

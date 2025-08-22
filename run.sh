@@ -4,4 +4,4 @@ pip install -r requirements.txt
 
 playwright install chromium
 
-python privacy_scraper.py --input urls.txt --out scraped --parallel 5
+python scraper/privacy_scraper.py --input scraper/urls.txt --out scraper/result --parallel 5

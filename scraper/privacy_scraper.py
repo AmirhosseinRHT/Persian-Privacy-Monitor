@@ -119,7 +119,7 @@ async def scrape_all(urls, out_dir: str, parallel: int):
 def main():
     parser = argparse.ArgumentParser(description="Privacy Policy Scraper")
     parser.add_argument("--input", type=str, default="urls.txt", help="File with URLs")
-    parser.add_argument("--out", type=str, default="scraped", help="Output directory")
+    parser.add_argument("--out", type=str, default="result", help="Output directory")
     parser.add_argument(
         "--parallel", type=int, default=3, help="Number of concurrent browsers"
     )
