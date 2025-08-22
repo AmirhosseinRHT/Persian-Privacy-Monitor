@@ -3,6 +3,7 @@ import asyncio
 import time
 from pathlib import Path
 from urllib.parse import urlparse
+import re
 
 import requests
 from bs4 import BeautifulSoup
@@ -31,33 +32,54 @@ def get_output_paths(url: str, out_dir: str):
     )
 
 
-def scrape_with_requests(url: str):
-    """Try scraping using requests + readability (fast path)."""
+def scrape_with_requests(url: str, min_line_length: int = 20):
+    """Try scraping using requests + readability (fast path) and filter short lines."""
     try:
         resp = requests.get(url, timeout=20, headers={"User-Agent": "Mozilla/5.0"})
         resp.raise_for_status()
+
         doc = Document(resp.text)
         html_content = doc.summary()
+
         text_content = BeautifulSoup(html_content, "html.parser").get_text(
             separator="\n", strip=True
         )
-        if len(text_content.split()) < 50:
+        lines = text_content.splitlines()
+        filtered_lines = []
+        for ln in lines:
+            ln = re.sub(r'\s+', ' ', ln).strip()
+            if len(ln) >= min_line_length:
+                filtered_lines.append(ln)
+        filtered_text = "\n".join(filtered_lines)
+        if len(filtered_text.split()) < 50:
             return None, None
-        return html_content, text_content
+
+        return html_content, filtered_text
+
     except Exception:
         return None, None
 
-
-async def scrape_with_playwright(url: str, pw):
-    """Scrape using Playwright (JS-rendered content)."""
+async def scrape_with_playwright(url: str, pw, min_line_length: int = 20):
+    """Scrape using Playwright (JS-rendered content) and filter short lines."""
     browser = await pw.chromium.launch(headless=True)
     page = await browser.new_page()
     try:
         await page.goto(url, timeout=60000)
         await page.wait_for_selector("body", timeout=20000)
+
         html = await page.content()
         text = await page.inner_text("body")
-        return html, text
+        lines = text.splitlines()
+        filtered_lines = []
+        for ln in lines:
+            ln = re.sub(r'\s+', ' ', ln).strip()
+            if len(ln) >= min_line_length:
+                filtered_lines.append(ln)
+
+        filtered_text = "\n".join(filtered_lines)
+
+        return html, filtered_text
+
     except Exception:
         return None, None
     finally:
