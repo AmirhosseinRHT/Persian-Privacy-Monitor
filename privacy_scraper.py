@@ -1,88 +1,122 @@
+import argparse
 import asyncio
-import hashlib
 import time
 from pathlib import Path
+from urllib.parse import urlparse
 
 import requests
 from bs4 import BeautifulSoup
 from readability import Document
-
 from playwright.async_api import async_playwright
 
 
-def make_safe_filename(url: str) -> str:
+def sanitize_filename(url: str) -> str:
 
+    """Make a safe filename from URL domain."""
     url = url.replace("http://", "").replace("https://", "")
     safe = url.replace(".", "-").replace(":", "").replace("/", "-")
     safe = "".join(c if c.isalnum() or c in "-_" else "" for c in safe)
-    return safe[:30]
+    return safe
 
 
-def save_output(url: str, html: str, text: str, out_dir: str = "scraped"):
-    """Save HTML and text to disk with unique name."""
+def get_output_paths(url: str, out_dir: str):
+    """Generate HTML/TXT output paths using domain + timestamp."""
     Path(out_dir).mkdir(parents=True, exist_ok=True)
     ts = time.strftime("%Y%m%d-%H%M%S")
-    updated_file_name = make_safe_filename(url)
-    html_path = Path(out_dir) / f"{updated_file_name}_{ts}.html"
-    txt_path = Path(out_dir) / f"{updated_file_name}_{ts}.txt"
-
-    html_path.write_text(html, encoding="utf-8")
-    txt_path.write_text(text, encoding="utf-8")
-
-    print(f"[OK] Saved {url} → {html_path}, {txt_path}")
+    domain = urlparse(url).netloc or "output"
+    safe_name = sanitize_filename(domain)
+    return (
+        Path(out_dir) / f"{safe_name}_{ts}.html",
+        Path(out_dir) / f"{safe_name}_{ts}.txt",
+    )
 
 
 def scrape_with_requests(url: str):
-    """Try scraping using requests + readability."""
-    resp = requests.get(url, timeout=20, headers={"User-Agent": "Mozilla/5.0"})
-    resp.raise_for_status()
-    doc = Document(resp.text)
-    html_content = doc.summary()
-    text_content = BeautifulSoup(html_content, "html.parser").get_text(separator="\n", strip=True)
-
-    if len(text_content.split()) < 50:
+    """Try scraping using requests + readability (fast path)."""
+    try:
+        resp = requests.get(url, timeout=20, headers={"User-Agent": "Mozilla/5.0"})
+        resp.raise_for_status()
+        doc = Document(resp.text)
+        html_content = doc.summary()
+        text_content = BeautifulSoup(html_content, "html.parser").get_text(
+            separator="\n", strip=True
+        )
+        if len(text_content.split()) < 50:
+            return None, None
+        return html_content, text_content
+    except Exception:
         return None, None
-    return html_content, text_content
 
 
-async def scrape_with_playwright(url: str):
-    """Scrape using Playwright (handles JS-rendered content)."""
-    async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
-        page = await browser.new_page()
+async def scrape_with_playwright(url: str, pw):
+    """Scrape using Playwright (JS-rendered content)."""
+    browser = await pw.chromium.launch(headless=True)
+    page = await browser.new_page()
+    try:
         await page.goto(url, timeout=60000)
         await page.wait_for_selector("body", timeout=20000)
-
         html = await page.content()
         text = await page.inner_text("body")
-
-        await browser.close()
         return html, text
+    except Exception:
+        return None, None
+    finally:
+        await browser.close()
 
 
-def scrape_privacy_page(url: str, out_dir: str = "scraped"):
-    """Main entry: try fast scraping first, fallback to Playwright if needed."""
-    try:
-        html, text = scrape_with_requests(url)
-        if html and text:
-            save_output(url, html, text, out_dir)
-            return
-        print(f"[!] Requests failed for {url}, retrying with Playwright...")
-    except Exception as e:
-        print(f"[!] Requests scraping error for {url}: {e}, switching to Playwright...")
+async def process_url(url: str, out_dir: str, pw):
+    """Process a single URL with requests first, then Playwright fallback."""
+    html, text = scrape_with_requests(url)
 
-    try:
-        html, text = asyncio.run(scrape_with_playwright(url))
-        if html and text:
-            save_output(url, html, text, out_dir)
-    except Exception as e:
-        print(f"[ERROR] Playwright scraping failed for {url}: {e}")
+    if not html or not text:
+        html, text = await scrape_with_playwright(url, pw)
+
+    if html and text:
+        html_path, txt_path = get_output_paths(url, out_dir)
+        html_path.write_text(html, encoding="utf-8")
+        txt_path.write_text(text, encoding="utf-8")
+        print(f"[OK] {url} → {html_path.name}, {txt_path.name}")
+    else:
+        print(f"[FAIL] Could not scrape {url}")
+
+
+async def scrape_all(urls, out_dir: str, parallel: int):
+    """Scrape all URLs in parallel with Playwright."""
+    sem = asyncio.Semaphore(parallel)
+
+    async with async_playwright() as pw:
+
+        async def bound_process(u):
+            async with sem:
+                await process_url(u.strip(), out_dir, pw)
+
+        tasks = [bound_process(u) for u in urls if u.strip()]
+        await asyncio.gather(*tasks)
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Privacy Policy Scraper")
+    parser.add_argument("--input", type=str, default="urls.txt", help="File with URLs")
+    parser.add_argument("--out", type=str, default="scraped", help="Output directory")
+    parser.add_argument(
+        "--parallel", type=int, default=3, help="Number of concurrent browsers"
+    )
+    parser.add_argument(
+        "--debug", action="store_true", help="Run static debug example instead of file"
+    )
+
+    args = parser.parse_args()
+
+    if args.debug:
+        urls = [
+            "https://www.digikala.com/page/privacy",
+        ]
+    else:
+        with open(args.input, "r", encoding="utf-8") as f:
+            urls = f.readlines()
+
+    asyncio.run(scrape_all(urls, args.out, args.parallel))
 
 
 if __name__ == "__main__":
-    urls = [
-        "https://www.technolife.com/staticpage/page-15/%D8%AD%D8%B1%DB%8C%D9%85%20%D8%AE%D8%B5%D9%88%D8%B5%DB%8C%20%DA%A9%D8%A7%D8%B1%D8%A8%D8%B1%D8%A7%D9%86",
-        "https://www.digikala.com/page/privacy",
-    ]
-    for u in urls:
-        scrape_privacy_page(u)
+    main()
