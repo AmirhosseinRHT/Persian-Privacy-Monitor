@@ -31,59 +31,45 @@ def get_output_paths(url: str, out_dir: str):
         Path(out_dir) / f"{safe_name}_{ts}.txt",
     )
 
+def extract_blocks(html: str, min_line_length: int = 10) -> str:
+    soup = BeautifulSoup(html, "html.parser")
+    texts = []
 
-def scrape_with_requests(url: str, min_line_length: int = 20):
-    """Try scraping using requests + readability (fast path) and filter short lines."""
+    for tag in soup.find_all(["p", "li", "h1", "h2", "h3"]):
+        txt = re.sub(r"\s+", " ", tag.get_text(strip=True))
+        if len(txt) >= min_line_length:
+            texts.append(txt)
+
+    return "\n".join(texts)
+
+
+def scrape_with_requests(url: str, min_line_length: int = 10):
     try:
         resp = requests.get(url, timeout=20, headers={"User-Agent": "Mozilla/5.0"})
         resp.raise_for_status()
-
-        doc = Document(resp.text)
-        html_content = doc.summary()
-
-        text_content = BeautifulSoup(html_content, "html.parser").get_text(
-            separator="\n", strip=True
-        )
-        lines = text_content.splitlines()
-        filtered_lines = []
-        for ln in lines:
-            ln = re.sub(r'\s+', ' ', ln).strip()
-            if len(ln) >= min_line_length:
-                filtered_lines.append(ln)
-        filtered_text = "\n".join(filtered_lines)
-        if len(filtered_text.split()) < 50:
+        html = resp.text
+        text = extract_blocks(html, min_line_length)
+        if len(text.split()) < 50:
             return None, None
-
-        return html_content, filtered_text
-
+        return html, text
     except Exception:
         return None, None
 
-async def scrape_with_playwright(url: str, pw, min_line_length: int = 20):
-    """Scrape using Playwright (JS-rendered content) and filter short lines."""
+
+async def scrape_with_playwright(url: str, pw, min_line_length: int = 10):
     browser = await pw.chromium.launch(headless=True)
     page = await browser.new_page()
     try:
         await page.goto(url, timeout=60000)
         await page.wait_for_selector("body", timeout=20000)
-
         html = await page.content()
-        text = await page.inner_text("body")
-        lines = text.splitlines()
-        filtered_lines = []
-        for ln in lines:
-            ln = re.sub(r'\s+', ' ', ln).strip()
-            if len(ln) >= min_line_length:
-                filtered_lines.append(ln)
-
-        filtered_text = "\n".join(filtered_lines)
-
-        return html, filtered_text
-
+        text = extract_blocks(html, min_line_length)
+        return html, text
     except Exception:
         return None, None
     finally:
         await browser.close()
+
 
 
 async def process_url(url: str, out_dir: str, pw):
