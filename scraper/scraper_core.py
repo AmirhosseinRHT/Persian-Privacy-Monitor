@@ -4,7 +4,8 @@ import requests
 
 from .utils import FileUtils
 from .content_extractor import ContentExtractor
-from .keyword import KEYWORDS
+from typing import List, Tuple, Optional
+from .keywords import KEYWORDS
 
 
 class Scraper:
@@ -14,31 +15,35 @@ class Scraper:
         self.out_dir = out_dir
         self.extractor = ContentExtractor(KEYWORDS, min_line_length)
 
-    def scrape_with_requests(self, url: str):
+    def scrape_with_requests(self, url: str) -> Tuple[Optional[str], Optional[str]]:
         try:
-            resp = requests.get(url, timeout=20, headers={"User-Agent": "Mozilla/5.0"})
+            resp = requests.get(url, timeout=20)
             resp.raise_for_status()
             html = resp.text
             text = self.extractor.extract_blocks(html)
-            if len(text.split()) < 50:
-                return None, None
             return html, text
-        except Exception:
-            return None, None
+        except Exception as e:
+            print(f"[FAIL] {url} ({type(e).__name__}: {e})")
+            return None, None   # 🔥 همیشه tuple برگردون
+
 
     async def scrape_with_playwright(self, url: str, pw):
         browser = await pw.chromium.launch(headless=True)
         page = await browser.new_page()
         try:
-            await page.goto(url, timeout=60000)
-            await page.wait_for_selector("body", timeout=20000)
+            await page.goto(url, timeout=60000, wait_until="networkidle")
+            await page.wait_for_timeout(3000)
+            text = await page.inner_text("body")
             html = await page.content()
-            text = self.extractor.extract_blocks(html)
+
             return html, text
-        except Exception:
+        except Exception as e: 
+            print(f"[FAIL] {url} ({type(e).__name__}: {e})")
             return None, None
         finally:
             await browser.close()
+
+
 
     async def process_url(self, url: str, pw):
         """Process a single URL with requests first, then Playwright fallback."""

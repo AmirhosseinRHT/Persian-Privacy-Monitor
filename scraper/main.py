@@ -1,6 +1,6 @@
 import argparse
 import asyncio
-from .scraper_core import Scraper
+from scraper.scraper_core import Scraper
 
 def main():
     parser = argparse.ArgumentParser(description="Privacy Policy Scraper")
@@ -15,7 +15,7 @@ def main():
     args = parser.parse_args()
 
     if args.debug:
-        urls = ["https://www.digikala.com/page/privacy"]
+        urls = ["https://www.filimo.com/asparagus/term"]
     else:
         with open(args.input, "r", encoding="utf-8") as f:
             urls = f.readlines()
