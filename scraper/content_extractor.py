@@ -8,17 +8,21 @@ from typing import List, Tuple, Optional
 class ContentExtractor:
     """Extracts relevant text blocks filtered by keywords.
     Features:
-    - container scoring (keyword density) to find the best content area
+    - container scoring (keyword density) to find content areas
+    - multi-threshold: select all containers above given score
     - structured parsing: dl/dt/dd and heading-based sections
     - substring keyword matching (keyword can be substring of a word)
     - ancestor-aware nav/footer detection
     """
 
-    def __init__(self, keywords: List[str], min_line_length: int = 10):
+    def __init__(self, keywords: List[str], min_line_length: int = 10,
+                 container_score_threshold: float = 0.05,
+                 multi_container_threshold: float = 0.2):
         self.keywords = [kw.lower() for kw in keywords]
         self.min_line_length = min_line_length
         self.min_section_words = max(5, self.min_line_length // 2)
-        self.container_score_threshold = 0.05
+        self.container_score_threshold = container_score_threshold
+        self.multi_container_threshold = multi_container_threshold
         self._ancestor_check_depth = 6
 
     # ---- helpers ----
@@ -29,9 +33,7 @@ class ContentExtractor:
         return re.findall(r"\w+", s, flags=re.UNICODE)
 
     def _count_keywords(self, s: str) -> int:
-        """
-        Count keyword matches where a keyword is a substring of any word in s.
-        """
+        """Count keyword matches where a keyword is a substring of any word in s."""
         low = s.lower()
         words = self._words(low)
         cnt = 0
@@ -42,10 +44,7 @@ class ContentExtractor:
         return cnt
 
     def _is_nav_or_footer(self, el) -> bool:
-        """
-        Check the element and its ancestors for navigation/footer indicators.
-        Returns True if any level contains role/id/class markers or tag name 'footer'.
-        """
+        """Check the element and its ancestors for nav/footer indicators."""
         node = el
         depth = 0
         while node is not None and depth < self._ancestor_check_depth:
@@ -75,10 +74,7 @@ class ContentExtractor:
         return False
 
     def _score_container(self, el) -> Tuple[float, int, int]:
-        """
-        Return (score, keyword_count, word_count) for a container element.
-        score = keyword_count / sqrt(word_count), penalize nav/footer.
-        """
+        """Return (score, keyword_count, word_count) for a container element."""
         if not isinstance(el, Tag):
             return 0.0, 0, 0
 
@@ -155,9 +151,7 @@ class ContentExtractor:
         return texts
 
     def extract_blocks(self, html: str) -> str:
-        """Extract relevant text blocks and filter by keyword substrings.
-        Returns a single string (text) suitable for writing to .txt file.
-        """
+        """Extract relevant text blocks and filter by keyword substrings."""
         soup = BeautifulSoup(html, "html.parser")
 
         candidates = []
@@ -173,18 +167,22 @@ class ContentExtractor:
         top_divs = soup.find_all("div", recursive=False)[:6]
         candidates.extend(top_divs)
 
-        best_score = 0.0
-        best_el = None
-        for c in candidates:
-            score, _, _ = self._score_container(c)
-            if score > best_score:
-                best_score = score
-                best_el = c
+        scored = [(c, *self._score_container(c)) for c in candidates]
+
+        scored.sort(key=lambda x: x[1], reverse=True)
+        selected = []
+        if scored:
+            best_score = scored[0][1]
+            if best_score >= self.container_score_threshold:
+                selected.append(scored[0][0])
+        for c, score, _, _ in scored[1:]:
+            if score >= self.multi_container_threshold:
+                selected.append(c)
 
         sections_texts = []
 
-        if best_el and best_score >= self.container_score_threshold:
-            dl_secs = self._parse_dl_sections(best_el)
+        for container in selected:
+            dl_secs = self._parse_dl_sections(container)
             if dl_secs:
                 for title, text in dl_secs:
                     cond = False
@@ -200,7 +198,7 @@ class ContentExtractor:
                         if text:
                             sections_texts.append(text)
             else:
-                h_secs = self._parse_heading_sections(best_el)
+                h_secs = self._parse_heading_sections(container)
                 for title, text in h_secs:
                     cond = False
                     if title and self._count_keywords(title) > 0:
@@ -215,14 +213,15 @@ class ContentExtractor:
                         if text:
                             sections_texts.append(text)
 
-            if not sections_texts:
-                for tag in best_el.find_all(["p", "li", "dd", "h1", "h2", "h3"]):
+            if not dl_secs and not h_secs:
+                for tag in container.find_all(["p", "li", "dd", "h1", "h2", "h3"]):
                     if self._is_nav_or_footer(tag):
                         continue
                     txt = self._clean_text(tag.get_text(" ", strip=True) or "")
                     if len(txt) >= self.min_line_length and self._count_keywords(txt) > 0:
                         sections_texts.append(txt)
-        else:
+
+        if not sections_texts:
             fallback_texts = self._collect_fallback(soup)
             if fallback_texts:
                 sections_texts.extend(fallback_texts)
