@@ -15,13 +15,11 @@ class ContentExtractor:
     """
 
     def __init__(self, keywords: List[str], min_line_length: int = 10):
-        # store lowercase keywords
         self.keywords = [kw.lower() for kw in keywords]
         self.min_line_length = min_line_length
-        # internal thresholds
         self.min_section_words = max(5, self.min_line_length // 2)
-        self.container_score_threshold = 0.05  # if best score < this, fallback
-        self._ancestor_check_depth = 6  # how many ancestor levels to inspect for nav/footer markers
+        self.container_score_threshold = 0.05
+        self._ancestor_check_depth = 6
 
     # ---- helpers ----
     def _clean_text(self, s: str) -> str:
@@ -33,7 +31,6 @@ class ContentExtractor:
     def _count_keywords(self, s: str) -> int:
         """
         Count keyword matches where a keyword is a substring of any word in s.
-        Example: keyword 'حریم' matches 'حریم‌خصوصی' or 'حریم-خصوصی'.
         """
         low = s.lower()
         words = self._words(low)
@@ -157,14 +154,12 @@ class ContentExtractor:
                 texts.append(txt)
         return texts
 
-    # ---- main public API ----
     def extract_blocks(self, html: str) -> str:
         """Extract relevant text blocks and filter by keyword substrings.
         Returns a single string (text) suitable for writing to .txt file.
         """
         soup = BeautifulSoup(html, "html.parser")
 
-        # candidate containers
         candidates = []
         selectors = [
             "main", "article", "section",
@@ -175,11 +170,9 @@ class ContentExtractor:
             for el in soup.select(sel):
                 candidates.append(el)
 
-        # add some top-level divs as fallback candidates (limit)
         top_divs = soup.find_all("div", recursive=False)[:6]
         candidates.extend(top_divs)
 
-        # score candidates
         best_score = 0.0
         best_el = None
         for c in candidates:
@@ -191,7 +184,6 @@ class ContentExtractor:
         sections_texts = []
 
         if best_el and best_score >= self.container_score_threshold:
-            # use best_el and parse structuredly
             dl_secs = self._parse_dl_sections(best_el)
             if dl_secs:
                 for title, text in dl_secs:
@@ -223,7 +215,6 @@ class ContentExtractor:
                         if text:
                             sections_texts.append(text)
 
-            # safety fallback within best_el
             if not sections_texts:
                 for tag in best_el.find_all(["p", "li", "dd", "h1", "h2", "h3"]):
                     if self._is_nav_or_footer(tag):
@@ -236,7 +227,6 @@ class ContentExtractor:
             if fallback_texts:
                 sections_texts.extend(fallback_texts)
 
-        # final normalize: deduplicate and join
         final_lines = []
         seen = set()
         for line in sections_texts:
