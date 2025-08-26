@@ -36,17 +36,11 @@ class ContentExtractor:
         """Count keyword matches where a keyword is a substring of any word in s."""
         low = s.lower()
         words = self._words(low)
-        cnt = 0
-        for w in words:
-            for kw in self.keywords:
-                if kw and kw in w:
-                    cnt += 1
-        return cnt
+        return sum(1 for w in words for kw in self.keywords if kw and kw in w)
 
     def _is_nav_or_footer(self, el) -> bool:
         """Check the element and its ancestors for nav/footer indicators."""
-        node = el
-        depth = 0
+        node, depth = el, 0
         while node is not None and depth < self._ancestor_check_depth:
             if isinstance(node, NavigableString):
                 node = getattr(node, "parent", None)
@@ -87,7 +81,7 @@ class ContentExtractor:
             score *= 0.1
         return score, keyword_count, word_count
 
-    # ---- parsers ----
+    # ---- parsing helpers ----
     def _parse_dl_sections(self, container) -> List[Tuple[Optional[str], str]]:
         """Return list of (title, text) from dl/dt/dd pairs."""
         sections = []
@@ -95,12 +89,10 @@ class ContentExtractor:
             for dt in dl.find_all("dt"):
                 title = self._clean_text(dt.get_text(" ", strip=True) or "")
                 dd = dt.find_next_sibling("dd")
-                text = ""
                 if dd:
                     text = self._clean_text(dd.get_text(" ", strip=True) or "")
                 else:
-                    parts = []
-                    sibling = dt.next_sibling
+                    parts, sibling = [], dt.next_sibling
                     while sibling and getattr(sibling, "name", None) != "dt":
                         if isinstance(sibling, Tag) and sibling.get_text:
                             parts.append(self._clean_text(sibling.get_text(" ", strip=True)))
@@ -114,14 +106,7 @@ class ContentExtractor:
         """Split container into sections by headings h1-h3."""
         headings = container.find_all(["h1", "h2", "h3"])
         if not headings:
-            text = []
-            for tag in container.find_all(["p", "li", "dd"]):
-                if self._is_nav_or_footer(tag):
-                    continue
-                t = self._clean_text(tag.get_text(" ", strip=True) or "")
-                if t:
-                    text.append(t)
-            return [(None, " ".join(text))] if text else []
+            return self._collect_paragraphs(container)
 
         sections = []
         for h in headings:
@@ -130,14 +115,23 @@ class ContentExtractor:
             for sib in h.next_siblings:
                 if getattr(sib, "name", None) in ("h1", "h2", "h3"):
                     break
-                if isinstance(sib, Tag) and sib.get_text:
-                    if self._is_nav_or_footer(sib):
-                        continue
+                if isinstance(sib, Tag) and sib.get_text and not self._is_nav_or_footer(sib):
                     t = self._clean_text(sib.get_text(" ", strip=True) or "")
                     if t:
                         parts.append(t)
             sections.append((title or None, " ".join(parts)))
         return sections
+
+    def _collect_paragraphs(self, container) -> List[Tuple[Optional[str], str]]:
+        """Collect p/li/dd text inside a container."""
+        text = []
+        for tag in container.find_all(["p", "li", "dd"]):
+            if self._is_nav_or_footer(tag):
+                continue
+            t = self._clean_text(tag.get_text(" ", strip=True) or "")
+            if t:
+                text.append(t)
+        return [(None, " ".join(text))] if text else []
 
     def _collect_fallback(self, soup) -> List[str]:
         """Fallback: collect p/li/h1..h3 across body but skip nav/footer."""
@@ -150,26 +144,23 @@ class ContentExtractor:
                 texts.append(txt)
         return texts
 
-    def extract_blocks(self, html: str) -> str:
-        """Extract relevant text blocks and filter by keyword substrings."""
-        soup = BeautifulSoup(html, "html.parser")
-
-        candidates = []
+    # ---- main pipeline ----
+    def _find_candidates(self, soup) -> List[Tag]:
+        """Find candidate containers for scoring."""
         selectors = [
             "main", "article", "section",
             "div#content", "div[id*='content']", "div[class*='content']",
             "div[class*='privacy']", "div[id*='privacy']", "dl", "body",
         ]
-        for sel in selectors:
-            for el in soup.select(sel):
-                candidates.append(el)
+        candidates = [el for sel in selectors for el in soup.select(sel)]
+        candidates.extend(soup.find_all("div", recursive=False)[:6])  # top divs
+        return candidates
 
-        top_divs = soup.find_all("div", recursive=False)[:6]
-        candidates.extend(top_divs)
-
+    def _select_containers(self, candidates: List[Tag]) -> List[Tag]:
+        """Score and select containers based on thresholds."""
         scored = [(c, *self._score_container(c)) for c in candidates]
-
         scored.sort(key=lambda x: x[1], reverse=True)
+
         selected = []
         if scored:
             best_score = scored[0][1]
@@ -178,61 +169,64 @@ class ContentExtractor:
         for c, score, _, _ in scored[1:]:
             if score >= self.multi_container_threshold:
                 selected.append(c)
+        return selected
+
+    def _extract_from_container(self, container: Tag) -> List[str]:
+        """Extract text blocks from a single container."""
+        sections_texts = []
+        dl_secs = self._parse_dl_sections(container)
+        h_secs = []
+
+        if dl_secs:
+            sections = dl_secs
+        else:
+            h_secs = self._parse_heading_sections(container)
+            sections = h_secs
+
+        if sections:
+            for title, text in sections:
+                cond = (
+                    (title and self._count_keywords(title) > 0)
+                    or (text and self._count_keywords(text) > 0)
+                    or (len(self._words(text)) >= self.min_section_words)
+                )
+                if cond:
+                    if title:
+                        sections_texts.append(title)
+                    if text:
+                        sections_texts.append(text)
+
+        if not dl_secs and not h_secs:  # paragraph fallback inside container
+            for tag in container.find_all(["p", "li", "dd", "h1", "h2", "h3"]):
+                if self._is_nav_or_footer(tag):
+                    continue
+                txt = self._clean_text(tag.get_text(" ", strip=True) or "")
+                if len(txt) >= self.min_line_length and self._count_keywords(txt) > 0:
+                    sections_texts.append(txt)
+
+        return sections_texts
+
+    def _deduplicate(self, texts: List[str]) -> List[str]:
+        """Remove duplicates and empty lines."""
+        final_lines, seen = [], set()
+        for line in texts:
+            l = line.strip()
+            if l and l not in seen:
+                seen.add(l)
+                final_lines.append(l)
+        return final_lines
+
+    def extract_blocks(self, html: str) -> str:
+        """Extract relevant text blocks and filter by keyword substrings."""
+        soup = BeautifulSoup(html, "html.parser")
+        candidates = self._find_candidates(soup)
+        selected = self._select_containers(candidates)
 
         sections_texts = []
-
         for container in selected:
-            dl_secs = self._parse_dl_sections(container)
-            if dl_secs:
-                for title, text in dl_secs:
-                    cond = False
-                    if title and self._count_keywords(title) > 0:
-                        cond = True
-                    if text and self._count_keywords(text) > 0:
-                        cond = True
-                    if len(self._words(text)) >= self.min_section_words:
-                        cond = True
-                    if cond:
-                        if title:
-                            sections_texts.append(title)
-                        if text:
-                            sections_texts.append(text)
-            else:
-                h_secs = self._parse_heading_sections(container)
-                for title, text in h_secs:
-                    cond = False
-                    if title and self._count_keywords(title) > 0:
-                        cond = True
-                    if text and self._count_keywords(text) > 0:
-                        cond = True
-                    if len(self._words(text)) >= self.min_section_words:
-                        cond = True
-                    if cond:
-                        if title:
-                            sections_texts.append(title)
-                        if text:
-                            sections_texts.append(text)
+            sections_texts.extend(self._extract_from_container(container))
 
-            if not dl_secs and not h_secs:
-                for tag in container.find_all(["p", "li", "dd", "h1", "h2", "h3"]):
-                    if self._is_nav_or_footer(tag):
-                        continue
-                    txt = self._clean_text(tag.get_text(" ", strip=True) or "")
-                    if len(txt) >= self.min_line_length and self._count_keywords(txt) > 0:
-                        sections_texts.append(txt)
+        if not sections_texts:  # global fallback
+            sections_texts.extend(self._collect_fallback(soup))
 
-        if not sections_texts:
-            fallback_texts = self._collect_fallback(soup)
-            if fallback_texts:
-                sections_texts.extend(fallback_texts)
-
-        final_lines = []
-        seen = set()
-        for line in sections_texts:
-            l = line.strip()
-            if not l or l in seen:
-                continue
-            seen.add(l)
-            final_lines.append(l)
-
-        return "\n\n".join(final_lines)
+        return "\n\n".join(self._deduplicate(sections_texts))
