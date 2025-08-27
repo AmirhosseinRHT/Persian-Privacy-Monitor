@@ -68,7 +68,9 @@ class ContentExtractor:
         return False
 
     def _score_container(self, el) -> Tuple[float, int, int]:
-        """Return (score, keyword_count, word_count) for a container element."""
+        """Return (score, keyword_count, word_count) for a container element.
+        If element has lots of text but few keywords, still score moderately.
+        """
         if not isinstance(el, Tag):
             return 0.0, 0, 0
 
@@ -77,6 +79,11 @@ class ContentExtractor:
         word_count = max(1, len(words))
         keyword_count = self._count_keywords(text)
         score = keyword_count / math.sqrt(word_count)
+
+        # Boost score if text is long, even with few keywords
+        if word_count >= 50 and keyword_count == 0:
+            score = 0.05  # small but enough to pass low threshold
+
         if self._is_nav_or_footer(el):
             score *= 0.1
         return score, keyword_count, word_count
@@ -172,36 +179,31 @@ class ContentExtractor:
         return selected
 
     def _extract_from_container(self, container: Tag) -> List[str]:
-        """Extract text blocks from a single container."""
+        """Extract text blocks from a container, including nested divs with long paragraphs."""
         sections_texts = []
+
         dl_secs = self._parse_dl_sections(container)
-        h_secs = []
+        h_secs = self._parse_heading_sections(container) if not dl_secs else []
 
-        if dl_secs:
-            sections = dl_secs
-        else:
-            h_secs = self._parse_heading_sections(container)
-            sections = h_secs
+        sections = dl_secs if dl_secs else h_secs
+        for title, text in sections:
+            cond = (
+                (title and self._count_keywords(title) > 0)
+                or (text and self._count_keywords(text) > 0)
+                or (len(self._words(text)) >= self.min_section_words)
+            )
+            if cond:
+                if title:
+                    sections_texts.append(title)
+                if text:
+                    sections_texts.append(text)
 
-        if sections:
-            for title, text in sections:
-                cond = (
-                    (title and self._count_keywords(title) > 0)
-                    or (text and self._count_keywords(text) > 0)
-                    or (len(self._words(text)) >= self.min_section_words)
-                )
-                if cond:
-                    if title:
-                        sections_texts.append(title)
-                    if text:
-                        sections_texts.append(text)
-
-        if not dl_secs and not h_secs:  # paragraph fallback inside container
-            for tag in container.find_all(["p", "li", "dd", "h1", "h2", "h3"]):
+        if not sections:
+            for tag in container.find_all(["p", "li", "dd", "h1", "h2", "h3", "div"]):
                 if self._is_nav_or_footer(tag):
                     continue
                 txt = self._clean_text(tag.get_text(" ", strip=True) or "")
-                if len(txt) >= self.min_line_length and self._count_keywords(txt) > 0:
+                if txt and len(txt.split()) >= 5:
                     sections_texts.append(txt)
 
         return sections_texts
