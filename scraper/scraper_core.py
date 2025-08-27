@@ -24,7 +24,7 @@ class Scraper:
             return html, text
         except Exception as e:
             print(f"[FAIL] {url} ({type(e).__name__}: {e})")
-            return None, None   # 🔥 همیشه tuple برگردون
+            return None, None
 
 
     async def scrape_with_playwright(self, url: str, pw):
@@ -33,8 +33,9 @@ class Scraper:
         try:
             await page.goto(url, timeout=60000, wait_until="networkidle")
             await page.wait_for_timeout(3000)
-            text = await page.inner_text("body")
+
             html = await page.content()
+            text = self.extractor.extract_blocks(html)
 
             return html, text
         except Exception as e: 
