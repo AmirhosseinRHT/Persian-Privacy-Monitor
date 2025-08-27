@@ -8,3 +8,5 @@ beautifulsoup4~=4.12
 readability-lxml~=0.8
 playwright~=1.48
 pymongo
+selenium
+pandas
