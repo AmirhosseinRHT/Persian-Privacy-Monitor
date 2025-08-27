@@ -1,21 +1,39 @@
 import asyncio
-from playwright.async_api import async_playwright
 import requests
-
-from .utils import FileUtils
-from .content_extractor import ContentExtractor
+from datetime import datetime
+from urllib.parse import urlparse
 from typing import List, Tuple, Optional
+
+from playwright.async_api import async_playwright
+from pymongo import MongoClient
+
+from .content_extractor import ContentExtractor
 from .keywords import KEYWORDS
 
 
 class Scraper:
-    """Main scraper class handling both requests + Playwright."""
+    """Main scraper class handling both requests + Playwright, with MongoDB saving."""
 
-    def __init__(self, out_dir: str, min_line_length: int = 50):
-        self.out_dir = out_dir
+    def __init__(self, min_line_length: int = 50,
+                 mongo_uri: str = "mongodb://localhost:27017",
+                 db_name: str = "scraperdb"):
         self.extractor = ContentExtractor(KEYWORDS, min_line_length)
 
+        self.client = MongoClient(mongo_uri)
+        self.db = self.client[db_name]
+        self.collection = self.db["scraped_pages"]
+
+    def _get_root_url(self, url: str) -> str:
+        """Return scheme://hostname part of URL."""
+        parsed = urlparse(url)
+        return f"{parsed.scheme}://{parsed.netloc}"
+
+    def _already_scraped(self, url: str) -> bool:
+        """Check if a URL is already in MongoDB."""
+        return self.collection.find_one({"url": url}) is not None
+
     def scrape_with_requests(self, url: str) -> Tuple[Optional[str], Optional[str]]:
+        """Scrape page using requests (fast path)."""
         try:
             resp = requests.get(url, timeout=20)
             resp.raise_for_status()
@@ -23,11 +41,11 @@ class Scraper:
             text = self.extractor.extract_blocks(html)
             return html, text
         except Exception as e:
-            print(f"[FAIL] {url} ({type(e).__name__}: {e})")
+            print(f"[FAIL][requests] {url} ({type(e).__name__}: {e})")
             return None, None
 
-
     async def scrape_with_playwright(self, url: str, pw):
+        """Scrape page using Playwright (fallback path)."""
         browser = await pw.chromium.launch(headless=True)
         page = await browser.new_page()
         try:
@@ -36,28 +54,56 @@ class Scraper:
 
             html = await page.content()
             text = self.extractor.extract_blocks(html)
-
             return html, text
-        except Exception as e: 
-            print(f"[FAIL] {url} ({type(e).__name__}: {e})")
+        except Exception as e:
+            print(f"[FAIL][playwright] {url} ({type(e).__name__}: {e})")
             return None, None
         finally:
             await browser.close()
 
+    def _score_candidates(self, html: str):
+        """Extract and score candidate containers from HTML."""
+        soup = self.extractor._get_soup(html)
+        candidates = self.extractor._find_candidates(soup)
 
+        results = []
+        for c in candidates:
+            score, kw, wc = self.extractor._score_container(c)
+            if score > 0:
+                results.append({
+                    "tag": c.name,
+                    "score": score,
+                    "keywords": kw,
+                    "words": wc
+                })
+        return results
 
     async def process_url(self, url: str, pw):
-        """Process a single URL with requests first, then Playwright fallback."""
+        """Process a single URL with requests first, then Playwright fallback. Save to MongoDB."""
+        if self._already_scraped(url):
+            print(f"[SKIP] {url} already scraped")
+            return
+
+        method = "requests"
         html, text = self.scrape_with_requests(url)
 
         if not html or not text:
+            method = "playwright"
             html, text = await self.scrape_with_playwright(url, pw)
 
         if html and text:
-            html_path, txt_path = FileUtils.get_output_paths(url, self.out_dir)
-            html_path.write_text(html, encoding="utf-8")
-            txt_path.write_text(text, encoding="utf-8")
-            print(f"[OK] {url} → {html_path.name}, {txt_path.name}")
+            scored_containers = self._score_candidates(html)
+            doc = {
+                "url": url,
+                "site_url": self._get_root_url(url),
+                "html": html,
+                "text": text,
+                "method": method,
+                "scores": scored_containers,
+                "saved_at": datetime.utcnow()
+            }
+            self.collection.insert_one(doc)
+            print(f"[OK] {url} → saved to MongoDB ({method})")
         else:
             print(f"[FAIL] Could not scrape {url}")
 

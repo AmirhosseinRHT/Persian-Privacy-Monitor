@@ -32,6 +32,10 @@ class ContentExtractor:
     def _words(self, s: str) -> List[str]:
         return re.findall(r"\w+", s, flags=re.UNICODE)
 
+    def _get_soup(self, html: str) -> BeautifulSoup:
+        """Helper to create BeautifulSoup object from HTML"""
+        return BeautifulSoup(html, "html.parser")
+
     def _count_keywords(self, s: str) -> int:
         """Count keyword matches where a keyword is a substring of any word in s."""
         low = s.lower()
@@ -228,7 +232,7 @@ class ContentExtractor:
         for container in selected:
             sections_texts.extend(self._extract_from_container(container))
 
-        if not sections_texts:  # global fallback
+        if not sections_texts:
             sections_texts.extend(self._collect_fallback(soup))
 
         return "\n\n".join(self._deduplicate(sections_texts))

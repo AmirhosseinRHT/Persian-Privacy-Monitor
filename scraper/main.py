@@ -20,7 +20,7 @@ def main():
         with open(args.input, "r", encoding="utf-8") as f:
             urls = f.readlines()
 
-    scraper = Scraper(args.out, args.min_length)
+    scraper = Scraper(args.min_length)
     asyncio.run(scraper.scrape_all(urls, args.parallel))
 
 
