@@ -1,0 +1,20 @@
+Analyze the given Persian Privacy Policy text. Focus only on identifying which personal data fields are mentioned as being collected, saved, or shared, and which ones are explicitly mentioned as not collected, not saved, or not shared.
+
+Output must be a clean JSON:
+
+{
+    "collect": [],
+    "save": [],
+    "share": [],
+    "not_collect": [],
+    "not_save": [],
+    "not_share": []
+}
+
+Rules:
+- Each array must contain only short keywords (e.g., "IP address", "email", "cookies").
+- Discard unrelated sections of the text.
+- If no data practices are described, return the JSON with empty arrays.
+-----------------------------------
+
+TEXT:
