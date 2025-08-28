@@ -4,9 +4,7 @@ beautifulsoup4>=4.12
 lxml>=4.9
 tldextract>=3.6
 requests~=2.32
-beautifulsoup4~=4.12
-readability-lxml~=0.8
 playwright~=1.48
-pymongo
-selenium
-pandas
+pymongo==4.10.1
+selenium==4.23.1
+pandas==2.2.3
