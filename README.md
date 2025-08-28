@@ -128,6 +128,13 @@ Start a local MongoDB instance before running or update `MongoDriver` to point t
 - Add unit tests for core helpers (cookie extraction, content extraction).
 - Add a small sample `urls.txt` containing a couple of known sites for quick smoke tests.
 
+## Acknowledgements
+
+This project includes code from [extracting-cookies-using-webcrawler](https://github.com/MSaeidSedighi/extracting-cookies-using-webcrawler)  
+by [MSaeidSedighi](https://github.com/MSaeidSedighi), licensed under the [MIT License](https://github.com/MSaeidSedighi/extracting-cookies-using-webcrawler/blob/main/LICENSE).
+
+We are grateful for this contribution, which powers the cookie extraction component of our system.
+
 ## License
 
 This project includes source code under the project's LICENSE file. Check `LICENSE` for details.
