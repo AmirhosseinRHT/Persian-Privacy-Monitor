@@ -75,13 +75,13 @@ if __name__ == "__main__":
     parser.add_argument("--url", type=str, help="Single URL to crawl")
     args = parser.parse_args()
 
-    if args.file and os.path.exists(args.file):
-        with open(args.file, "r") as f:
+    if args.input and os.path.exists(args.input):
+        with open(args.input, "r") as f:
             raw_urls = [line.strip() for line in f if line.strip()]
     elif args.url:
         raw_urls = [args.url]
     else:
-        print("Error: Provide either --file or --url")
+        print("Error: Provide either --input or --url")
         exit()
 
     print(f"Loaded {len(raw_urls)} URLs.")
