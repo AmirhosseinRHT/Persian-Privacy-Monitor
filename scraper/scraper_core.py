@@ -5,10 +5,10 @@ from urllib.parse import urlparse
 from typing import List, Tuple, Optional
 
 from playwright.async_api import async_playwright
-from pymongo import MongoClient
 
 from .content_extractor import ContentExtractor
 from .keywords import KEYWORDS
+from utils.mongo_driver import MongoDriver
 
 
 class Scraper:
@@ -18,19 +18,12 @@ class Scraper:
                  mongo_uri: str = "mongodb://localhost:27017",
                  db_name: str = "scraperdb"):
         self.extractor = ContentExtractor(KEYWORDS, min_line_length)
-
-        self.client = MongoClient(mongo_uri)
-        self.db = self.client[db_name]
-        self.collection = self.db["scraped_pages"]
+        self.mongo = MongoDriver(mongo_uri, db_name, "scraped_pages")
 
     def _get_root_url(self, url: str) -> str:
         """Return scheme://hostname part of URL."""
         parsed = urlparse(url)
         return f"{parsed.scheme}://{parsed.netloc}"
-
-    def _already_scraped(self, url: str) -> bool:
-        """Check if a URL is already in MongoDB."""
-        return self.collection.find_one({"url": url}) is not None
 
     def scrape_with_requests(self, url: str) -> Tuple[Optional[str], Optional[str]]:
         """Scrape page using requests (fast path)."""
@@ -80,7 +73,7 @@ class Scraper:
 
     async def process_url(self, url: str, pw):
         """Process a single URL with requests first, then Playwright fallback. Save to MongoDB."""
-        if self._already_scraped(url):
+        if self.mongo.already_scraped(url):
             print(f"[SKIP] {url} already scraped")
             return
 
@@ -102,7 +95,7 @@ class Scraper:
                 "scores": scored_containers,
                 "saved_at": datetime.utcnow()
             }
-            self.collection.insert_one(doc)
+            self.mongo.insert_doc(doc)
             print(f"[OK] {url} → saved to MongoDB ({method})")
         else:
             print(f"[FAIL] Could not scrape {url}")

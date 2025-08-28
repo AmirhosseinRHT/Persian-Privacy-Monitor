@@ -4,7 +4,7 @@ from scraper.scraper_core import Scraper
 
 def main():
     parser = argparse.ArgumentParser(description="Privacy Policy Scraper")
-    parser.add_argument("--input", type=str, default="urls.txt", help="File with URLs")
+    parser.add_argument("--input", type=str, default="../urls.txt", help="File with URLs")
     parser.add_argument("--out", type=str, default="result", help="Output directory")
     parser.add_argument("--parallel", type=int, default=3, help="Concurrent browsers")
     parser.add_argument(
