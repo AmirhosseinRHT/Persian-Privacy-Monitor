@@ -1,0 +1,21 @@
+From the given Persian Privacy Policy text, identify only the data entities mentioned under practices such as collection, storage, and sharing. 
+
+Return them in the following JSON structure:
+
+{
+    "collect": [],
+    "save": [],
+    "share": [],
+    "not_collect": [],
+    "not_save": [],
+    "not_share": []
+}
+
+Output requirements:
+- Extract only entities, not full descriptive sentences.
+- Each item should be as atomic as possible, e.g., split "name, address, and phone number" into separate strings.
+- If the text has no relevant practices, output the same JSON with empty lists.
+-----------------------------------
+
+TEXT:
+
