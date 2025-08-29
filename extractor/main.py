@@ -14,7 +14,7 @@ class PromptSender:
 
         self.client = openai.OpenAI(
             base_url="https://api.llm7.io/v1",
-            api_key="unused"
+            api_key="slHENJhFzy4owiF7geiQZrR4CxlR1FPsy+HZSGEPme5pJx9tQWwxMRHc/pVR/epCXMzuSibStPPpWJx1uBvtE9kQL5br4FqaPtj9uPDvkFplE/5qpzmc7TO4ftXfbJvWLjg="
         )
 
         self.source_driver = MongoDriver(collection="scraped_pages")
