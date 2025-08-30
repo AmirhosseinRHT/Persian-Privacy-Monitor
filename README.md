@@ -16,6 +16,8 @@ This README documents how the code is organized, what dependencies are required,
 - `run.sh` — convenience script with common example commands.
 - `urls.txt` — list of target URLs (one per line) used by the scrapers/crawlers.
 
+- `extractor/` — helper that reads scraped text from MongoDB, sends prompts to an LLM API, and stores responses. Entry point: `extractor/main.py`, implementation in `extractor/prompt_api.py`.
+
 ## Quick checklist (what this README covers)
 
 - Description of code components: Done
@@ -89,7 +91,13 @@ python -m scraper.main --input urls.txt --out result --parallel 3
 - Run the crawler (Selenium-based cookie collector):
 
 ```bash
-python -m crawler.crawler --input urls.txt
+python -m crawler.main --input urls.txt
+```
+
+- Run the extractor (send prompts to LLM over scraped pages):
+
+```bash
+python -m extractor.main --input urls.txt --prompt data-practices-LLM-result/prompt/sample1.txt
 ```
 
 - A convenience example is included in `run.sh`. You can inspect and run it from the project root:
@@ -99,6 +107,8 @@ bash run.sh
 ```
 
 If you get "ModuleNotFoundError: No module named 'utils'" when running `crawler/crawler.py` directly, use the `-m` option from project root or add the project root to `PYTHONPATH`.
+
+Security note: `extractor/prompt_api.py` currently contains a hard-coded API key string. Storing secrets in source is insecure. Replace this with an environment variable (for example, `LLM_API_KEY`) and load it at runtime instead.
 
 ## MongoDB notes
 
