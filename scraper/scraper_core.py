@@ -1,3 +1,10 @@
+import sys
+import os
+
+proj_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if proj_root not in sys.path:
+    sys.path.insert(0, proj_root)
+
 import asyncio
 import requests
 from datetime import datetime
@@ -6,7 +13,7 @@ from typing import List, Tuple, Optional
 
 from playwright.async_api import async_playwright
 
-from .content_extractor import ContentExtractor
+from scraper.content_extractor import ContentExtractor
 from .keywords import KEYWORDS
 from utils.mongo_driver import MongoDriver
 
@@ -15,10 +22,9 @@ class Scraper:
     """Main scraper class handling both requests + Playwright, with MongoDB saving."""
 
     def __init__(self, min_line_length: int = 50,
-                 mongo_uri: str = "mongodb://localhost:27017",
-                 db_name: str = "scraperdb"):
+                 db_name: str = "privacy_monitor"):
         self.extractor = ContentExtractor(KEYWORDS, min_line_length)
-        self.mongo = MongoDriver(mongo_uri, db_name, "scraped_pages")
+        self.mongo = MongoDriver(db_name=db_name, collection="scraped_pages")
 
     def _get_root_url(self, url: str) -> str:
         """Return scheme://hostname part of URL."""

@@ -59,7 +59,7 @@ def load_urls(args):
 
 def setup_crawler():
     """Initialize database connection and crawler instance."""
-    mongo = MongoDriver(db_name="scraperdb", collection="crawled_cookies")
+    mongo = MongoDriver(collection="crawled_cookies")
     return CookieCrawler(mongo)
 
 def execute_crawl(crawler, driver, urls):

@@ -1,10 +1,17 @@
 import argparse
 import asyncio
+import sys
+import os
+
+proj_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if proj_root not in sys.path:
+    sys.path.insert(0, proj_root)
+
 from scraper.scraper_core import Scraper
 
 def main():
     parser = argparse.ArgumentParser(description="Privacy Policy Scraper")
-    parser.add_argument("--input", type=str, default="../urls.txt", help="File with URLs")
+    parser.add_argument("--input", type=str, default="urls.txt", help="File with URLs")
     parser.add_argument("--out", type=str, default="result", help="Output directory")
     parser.add_argument("--parallel", type=int, default=3, help="Concurrent browsers")
     parser.add_argument(
