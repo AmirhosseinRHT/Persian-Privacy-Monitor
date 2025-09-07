@@ -1,3 +1,5 @@
+import json
+import re
 from urllib.parse import urlparse
 import openai
 
@@ -25,6 +27,25 @@ class PromptApi:
         parsed = urlparse(url)
         return f"{parsed.scheme}://{parsed.netloc}"
 
+    def clean_response(self, text: str) -> dict:
+        """
+        Extract JSON block from text, validate, and return as dict.
+        """
+        # Extract first {...} block
+        match = re.search(r"\{.*\}", text, re.DOTALL)
+        if not match:
+            raise ValueError("No JSON object found in response")
+
+        raw_json = match.group(0)
+
+        # Parse + normalize
+        try:
+            data = json.loads(raw_json)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Invalid JSON from model: {e}")
+
+        return data
+
     def process_url(self, url: str):
         url = self.get_root_url(url)
 
@@ -43,17 +64,24 @@ class PromptApi:
 
         result_text = response.choices[0].message.content
 
+        try:
+            clean_json = self.clean_response(result_text)
+        except Exception as e:
+            print(f"[ERROR] Could not parse JSON for {url}: {e}")
+            return None
+
         result_doc = {
             "url": url,
             "prompt_file": self.prompt_path,
             "prompt": self.base_prompt,
             "appended_doc_text": doc["text"],
-            "response": result_text
+            # Save as compact JSON string
+            "response": clean_json
         }
 
         self.target_driver.insert_doc(result_doc)
         print(f"[OK] Saved response for {url}")
-        return result_text
+        return clean_json
 
     def run(self):
         urls = []
