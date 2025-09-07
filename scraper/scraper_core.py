@@ -61,7 +61,7 @@ class Scraper:
             await browser.close()
 
     def _score_candidates(self, html: str):
-        """Extract and score candidate containers from HTML."""
+        """Extract and score candidate containers from HTML, with more details."""
         soup = self.extractor._get_soup(html)
         candidates = self.extractor._find_candidates(soup)
 
@@ -69,13 +69,18 @@ class Scraper:
         for c in candidates:
             score, kw, wc = self.extractor._score_container(c)
             if score > 0:
+                raw_text = self.extractor._clean_text(c.get_text(" ", strip=True) or "")
                 results.append({
                     "tag": c.name,
-                    "score": score,
+                    "attrs": dict(c.attrs),
+                    "score": round(score, 4),
                     "keywords": kw,
-                    "words": wc
+                    "words": wc,
+                    "text_preview": raw_text[:200],
+                    "text_len": len(raw_text)
                 })
         return results
+
 
     async def process_url(self, url: str, pw):
         """Process a single URL with requests first, then Playwright fallback. Save to MongoDB."""
@@ -102,7 +107,7 @@ class Scraper:
                 "saved_at": datetime.utcnow()
             }
             self.mongo.insert_doc(doc)
-            print(f"[OK] {url} → saved to MongoDB ({method})")
+            print(f"[OK] {url} → saved to database ({method})")
         else:
             print(f"[FAIL] Could not scrape {url}")
 

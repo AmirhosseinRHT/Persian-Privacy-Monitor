@@ -162,24 +162,39 @@ class ContentExtractor:
             "main", "article", "section",
             "div#content", "div[id*='content']", "div[class*='content']",
             "div[class*='privacy']", "div[id*='privacy']", "dl", "body",
+            "div[class*='terms']", "div[id*='terms']",
+            "div[class*='policy']", "div[id*='policy']",
+            "div[class*='legal']", "div[id*='legal']",
         ]
         candidates = [el for sel in selectors for el in soup.select(sel)]
-        candidates.extend(soup.find_all("div", recursive=False)[:6])  # top divs
+        candidates.extend(soup.find_all("div", recursive=False)[:6])
         return candidates
-
+    
     def _select_containers(self, candidates: List[Tag]) -> List[Tag]:
-        """Score and select containers based on thresholds."""
+        """Score and select containers more flexibly.
+        - Always keep the best-scoring container
+        - Include other containers if they are reasonably close in score
+        - Fall back to all above container_score_threshold
+        """
         scored = [(c, *self._score_container(c)) for c in candidates]
+        scored = [s for s in scored if s[1] > 0]
+        if not scored:
+            return []
+
         scored.sort(key=lambda x: x[1], reverse=True)
+        best_score = scored[0][1]
 
         selected = []
-        if scored:
-            best_score = scored[0][1]
-            if best_score >= self.container_score_threshold:
-                selected.append(scored[0][0])
-        for c, score, _, _ in scored[1:]:
-            if score >= self.multi_container_threshold:
+        for c, score, _, _ in scored:
+            if c == scored[0][0]:
                 selected.append(c)
+                continue
+            if score >= best_score * 0.4:
+                selected.append(c)
+                continue
+            if score >= self.container_score_threshold:
+                selected.append(c)
+
         return selected
 
     def _extract_from_container(self, container: Tag) -> List[str]:
@@ -232,7 +247,6 @@ class ContentExtractor:
         for container in selected:
             sections_texts.extend(self._extract_from_container(container))
 
-        if not sections_texts:
-            sections_texts.extend(self._collect_fallback(soup))
+        sections_texts.extend(self._collect_fallback(soup))
 
         return "\n\n".join(self._deduplicate(sections_texts))
