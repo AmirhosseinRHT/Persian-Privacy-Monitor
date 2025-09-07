@@ -1,24 +1,27 @@
-I have a text in Persian (Privacy Policy of a website). Your task is to extract only the parts related to "data practices" (for example: what data is collected, what data is saved, what data is shared, and what data is explicitly stated as not collected, not saved, or not shared). All other parts of the text must be ignored and discarded.
-
+I have a text in Persian (Privacy Policy of a website). Your task is to extract only the parts related to "data practices" (for example: what data is collected, what data is saved, what data is shared, and what data is explicitly stated as not collected, not saved, or not shared). This also includes any data mentioned as being collected, saved, or shared through cookies. All other parts of the text must be ignored and discarded.
 The output must always be a valid JSON in the following format, with no extra explanation or nesting:
 
+```json
 {
     "collect": [],
     "save": [],
     "share": [],
     "not_collect": [],
     "not_save": [],
-    "not_share": []
+    "not_share": [],
+    "cookie": []
 }
+```
 
-Rules:
-- If the text contains no relevant information about data practices, return exactly the same JSON above with empty arrays.
-- Extract only the main entities or keywords mentioned, not entire sentences.  
-  Example: if the text says "name, address, and phone number of another person", the output must be: "name", "address", "phone number of another person".
-- Each entity must be a separate string in the JSON array.
-- Ignore filler words and keep only the meaningful data fields.
-- Do not include any explanation, comments, or formatting outside of the JSON.
+### Rules:
+
+* If the text contains no relevant information about data practices, return exactly the same JSON above with empty arrays.
+* Extract only the main entities or keywords mentioned, not entire sentences.
+  Example: if the text says "name, address, and phone number of another person", the output must be: `"name"`, `"address"`, `"phone number of another person"`.
+* Each entity must be a separate string in the JSON array.
+* If cookies are mentioned as collecting, saving, or sharing data, extract the specific data types (e.g., `"IP address"`, `"browsing history"`, `"device information"`) and include them in the `"cookie"` array. These items may also appear in the other relevant arrays.
+* Ignore filler words and keep only the meaningful data fields.
+* Do not include any explanation, comments, or formatting outside of the JSON.
 
 -----------------------
 TEXT:
-

@@ -1,20 +1,25 @@
-From the given Persian Privacy Policy text, identify only the data entities mentioned under practices such as collection, storage, and sharing. 
-
+From the given Persian Privacy Policy text, identify only the data entities mentioned under practices such as collection, storage, and sharing. This also includes data explicitly stated as being collected, saved, or shared through cookies.
 Return them in the following JSON structure:
 
+```json
 {
     "collect": [],
     "save": [],
     "share": [],
     "not_collect": [],
     "not_save": [],
-    "not_share": []
+    "not_share": [],
+    "cookie": []
 }
+```
 
-Output requirements:
-- Extract only entities, not full descriptive sentences.
-- Each item should be as atomic as possible, e.g., split "name, address, and phone number" into separate strings.
-- If the text has no relevant practices, output the same JSON with empty lists.
+### Output requirements:
+
+* Extract only entities, not full descriptive sentences.
+* Each item should be as atomic as possible, e.g., split `"name, address, and phone number"` into separate strings: `"name"`, `"address"`, `"phone number"`.
+* If cookies are mentioned, place the related data entities in the `"cookie"` array. These entities may also appear in the other relevant arrays (`collect`, `save`, `share`).
+* If the text has no relevant practices, output the same JSON with empty lists.
+* Do not include any explanation, comments, or formatting outside of the JSON.
 -----------------------------------
 
 TEXT:
