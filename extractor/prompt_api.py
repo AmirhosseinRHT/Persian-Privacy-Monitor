@@ -75,7 +75,6 @@ class PromptApi:
             "prompt_file": self.prompt_path,
             "prompt": self.base_prompt,
             "appended_doc_text": doc["text"],
-            # Save as compact JSON string
             "response": clean_json
         }
 
