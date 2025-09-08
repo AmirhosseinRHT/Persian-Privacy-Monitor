@@ -25,8 +25,6 @@ class CookieCrawler:
     
     def save_cookies(self, cookies_list, root_url):
         """Save all cookies of a website as a single document in MongoDB."""
-        if not cookies_list:
-            print("No cookies to insert.")
         doc = {
             "root_url": root_url,
             "cookies": cookies_list,
