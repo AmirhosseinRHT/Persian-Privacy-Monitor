@@ -87,9 +87,8 @@ class ContentExtractor:
         keyword_count = self._count_keywords(text)
         score = keyword_count / math.sqrt(word_count)
 
-        # Boost score if text is long, even with few keywords
         if word_count >= 50 and keyword_count == 0:
-            score = 0.05  # small but enough to pass low threshold
+            score = 0.05
 
         if self._is_nav_or_footer(el):
             score *= 0.1
