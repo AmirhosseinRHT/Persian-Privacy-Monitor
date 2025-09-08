@@ -13,5 +13,6 @@ def parse_arguments():
 
 if __name__ == "__main__":
     args = parse_arguments()
+    print("Started Sending prompt to Extract practices using LLM")
     sender = PromptApi(prompt_path=args.prompt, urls_path=args.input, debug=args.debug)
     sender.run()

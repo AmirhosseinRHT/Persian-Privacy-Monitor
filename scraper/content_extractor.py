@@ -33,8 +33,11 @@ class ContentExtractor:
         return re.findall(r"\w+", s, flags=re.UNICODE)
 
     def _get_soup(self, html: str) -> BeautifulSoup:
-        """Helper to create BeautifulSoup object from HTML"""
-        return BeautifulSoup(html, "html.parser")
+        soup = BeautifulSoup(html, "html.parser")
+        for tag in soup(["script", "style", "noscript", "template"]):
+            tag.decompose()
+        return soup
+
 
     def _count_keywords(self, s: str) -> int:
         """Count keyword matches where a keyword is a substring of any word in s."""
@@ -171,11 +174,6 @@ class ContentExtractor:
         return candidates
     
     def _select_containers(self, candidates: List[Tag]) -> List[Tag]:
-        """Score and select containers more flexibly.
-        - Always keep the best-scoring container
-        - Include other containers if they are reasonably close in score
-        - Fall back to all above container_score_threshold
-        """
         scored = [(c, *self._score_container(c)) for c in candidates]
         scored = [s for s in scored if s[1] > 0]
         if not scored:
@@ -184,9 +182,14 @@ class ContentExtractor:
         scored.sort(key=lambda x: x[1], reverse=True)
         best_score = scored[0][1]
 
+        high_threshold = max(0.3, best_score * 0.8)
+
         selected = []
         for c, score, _, _ in scored:
             if c == scored[0][0]:
+                selected.append(c)
+                continue
+            if score >= high_threshold:
                 selected.append(c)
                 continue
             if score >= best_score * 0.4:
@@ -194,8 +197,8 @@ class ContentExtractor:
                 continue
             if score >= self.container_score_threshold:
                 selected.append(c)
-
         return selected
+
 
     def _extract_from_container(self, container: Tag) -> List[str]:
         """Extract text blocks from a container, including nested divs with long paragraphs."""
