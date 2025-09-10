@@ -22,6 +22,7 @@ The output must always be a valid JSON in the following format, with no extra ex
 * If cookies are mentioned as collecting, saving, or sharing data, extract the specific data types (e.g., `"IP address"`, `"browsing history"`, `"device information"`) and include them in the `"cookie"` array. These items may also appear in the other relevant arrays.
 * Ignore filler words and keep only the meaningful data fields.
 * Do not include any explanation, comments, or formatting outside of the JSON.
+* Do not translate persian fields into English.
 
 -----------------------
 TEXT:

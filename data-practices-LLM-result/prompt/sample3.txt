@@ -20,6 +20,7 @@ Output must be a clean JSON:
 * Discard unrelated sections of the text.
 * If no data practices are described, return the JSON with empty arrays.
 * Do not include any explanation, comments, or formatting outside of the JSON.
+* Do not translate persian fields into English.
 
 -----------------------------------
 

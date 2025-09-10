@@ -20,6 +20,8 @@ Return them in the following JSON structure:
 * If cookies are mentioned, place the related data entities in the `"cookie"` array. These entities may also appear in the other relevant arrays (`collect`, `save`, `share`).
 * If the text has no relevant practices, output the same JSON with empty lists.
 * Do not include any explanation, comments, or formatting outside of the JSON.
+* Do not translate persian fields into English.
+
 -----------------------------------
 
 TEXT:
