@@ -1,0 +1,27 @@
+You are given two inputs:
+
+1. A canonical list of normalized entities (in Persian).
+2. A JSON dataset describing websites’ data practices, where each category contains textual items in Persian or English.
+
+Your task is to:
+- For every item in the JSON, find the closest match from the canonical entity list.
+- Replace the JSON item with the canonical form from the entity list.
+- ** Important** : every value in data practices json must be exactly available in canonical list or be replaced with on of them.
+- Do not add new items or remove existing ones. The JSON structure and the number of items must remain exactly the same.
+- Only replace each phrase with its best matching normalized entity from the list.
+- The output should be the updated JSON dataset with all items replaced by their canonical equivalents.
+- If the text contains no relevant information about data practices, return exactly the same JSON below with empty arrays.
+output format:
+```json
+{
+    "collect": [],
+    "save": [],
+    "share": [],
+    "not_collect": [],
+    "not_save": [],
+    "not_share": [],
+    "cookie": []
+}
+```
+Return only the final updated JSON.
+----------------------------------
