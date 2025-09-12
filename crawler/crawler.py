@@ -21,12 +21,12 @@ class CookieCrawler:
     
     def has_been_crawled(self, root_url):
         """Check if a root URL has already been crawled."""
-        return self.mongo.collection.find_one({"root_url": root_url}) is not None
+        return self.mongo.collection.find_one({"url": root_url}) is not None
     
     def save_cookies(self, cookies_list, root_url):
         """Save all cookies of a website as a single document in MongoDB."""
         doc = {
-            "root_url": root_url,
+            "url": root_url,
             "cookies": cookies_list,
             "timestamp": datetime.now().isoformat()
         }

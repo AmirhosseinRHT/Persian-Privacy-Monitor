@@ -57,12 +57,12 @@ def load_urls(args):
     else:
         raise ValueError("Provide either --input, --url, or enable --debug mode")
 
-def setup_crawler():
+def setup_crawler() -> CookieCrawler:
     """Initialize database connection and crawler instance."""
     mongo = MongoDriver(collection="crawled_cookies")
     return CookieCrawler(mongo)
 
-def execute_crawl(crawler, driver, urls):
+def execute_crawl(crawler : CookieCrawler, driver, urls):
     """Execute the crawling process for all URLs."""
     all_cookies = []
     for i, url in enumerate(urls):
