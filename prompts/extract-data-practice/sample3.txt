@@ -1,0 +1,29 @@
+Analyze the given Persian Privacy Policy text. Focus only on identifying which personal data fields are mentioned as being collected, saved, or shared, and which ones are explicitly mentioned as not collected, not saved, or not shared. This also includes any data fields that are described as being collected, saved, or shared through cookies.
+Output must be a clean JSON:
+
+```json
+{
+    "collect": [],
+    "save": [],
+    "share": [],
+    "not_collect": [],
+    "not_save": [],
+    "not_share": [],
+    "cookie": []
+}
+```
+
+### Rules:
+
+* Each array must contain only short keywords (e.g., `"IP address"`, `"email"`, `"browsing history"`).
+* If cookies are mentioned, extract the data fields associated with them and place them in the `"cookie"` array. These fields may also appear in the other relevant arrays.
+* Discard unrelated sections of the text.
+* If no data practices are described, return the JSON with empty arrays.
+* Do not include any explanation, comments, or formatting outside of the JSON.
+* Do not translate persian fields into English.
+* Do not translate Persian fields into English.
+* **If two or more entities are combined with "و" (and), split them into separate items. For example: `"نام و نام خانوادگی"` → `"نام"`, `"نام خانوادگی"`. `"مدل و نسخه سیستم عامل"` → `"مدل سیستم عامل"`, `"نسخه سیستم عامل"`.**
+
+-----------------------------------
+
+TEXT:
