@@ -19,7 +19,7 @@ class EvaluationTool:
         doc = self.target_collection.find_one({"url": url})
         if not doc:
             raise ValueError(f"No processed data found for URL: {url}")
-        return doc["replaced_response"]
+        return doc["response_normalized"]
     
     def _calculate_category_agreement(self, expected_cat: list, actual_cat: list, all_items: set) -> float:
         expected_vector = {item: 1 if item in expected_cat else 0 for item in all_items}

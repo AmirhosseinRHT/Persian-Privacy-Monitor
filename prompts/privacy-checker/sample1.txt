@@ -1,0 +1,39 @@
+You are given two types of information:
+
+1. Cookies set by a website
+2. The website's declared data practices in its privacy policy (already normalized into structured JSON)
+
+Your task:
+- Compare the cookies with the declared practices
+- Identify privacy violations if any exist
+- Each violation must be categorized into one or more of the following categories:
+  - Undeclared Data Collection
+  - Undeclared Data Sharing
+  - Undeclared Data Storage
+  - Inconsistent Retention
+  - Excessive Scope
+  - Third-party Tracking
+  - Cross-site Tracking
+  - Security Weakness
+
+Output:
+- Return a JSON object with:
+  {
+    "violations": [
+      {
+        "category": "...",
+        "description": "...",
+        "evidence": [ ...list of cookies or practices that caused the issue... ],
+        "severity_score": 1-5
+      }
+    ]
+  }
+
+Rules:
+- Always give at least an empty array if no violation is found.
+- Severity scoring guideline:
+  1 = negligible
+  2 = low
+  3 = moderate
+  4 = high
+  5 = critical
