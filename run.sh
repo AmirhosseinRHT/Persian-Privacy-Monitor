@@ -17,3 +17,5 @@ python -m scraper.main --input urls.txt --out scraper/result --parallel 5
 python -m crawler.main --input urls.txt --output crawler/crawled_result.csv
 
 python -m extractor.main --input urls.txt
+
+python -m evaluator.main --prompt prompts/privacy-checker/sample1.txt --report

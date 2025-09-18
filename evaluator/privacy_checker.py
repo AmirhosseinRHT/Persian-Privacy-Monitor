@@ -1,13 +1,12 @@
 import json
 import re
-from urllib.parse import urlparse
 import openai
 from utils.mongo_driver import MongoDriver
-from typing import Optional
 import matplotlib.pyplot as plt
 import pandas as pd
 
 LLM_MODEL = "gpt-4.1-nano-2025-04-14"
+
 
 class PrivacyChecker:
     def __init__(self, violation_prompt_path: str, debug: bool = False):
@@ -116,9 +115,9 @@ class PrivacyChecker:
         print(df.groupby("category")["severity"].describe())
 
         # Bar chart - average severity per category
-        plt.figure(figsize=(8,6))
+        plt.figure(figsize=(8, 6))
         df.groupby("category")["severity"].mean().plot(
-            kind="bar", 
+            kind="bar",
             title="Average Severity per Category"
         )
         plt.ylabel("Average Severity (1-5)")
@@ -126,9 +125,9 @@ class PrivacyChecker:
         plt.show()
 
         # Horizontal bar chart - normalized severity per website
-        plt.figure(figsize=(8,6))
+        plt.figure(figsize=(8, 6))
         df.groupby("url")["normalized"].mean().plot(
-            kind="barh", 
+            kind="barh",
             title="Normalized Severity per Website"
         )
         plt.xlabel("Normalized Severity (0-1)")
@@ -136,19 +135,12 @@ class PrivacyChecker:
         plt.show()
 
         # Pie chart - distribution of violations by category
-        plt.figure(figsize=(7,7))
+        plt.figure(figsize=(7, 7))
         df["category"].value_counts().plot(
-            kind="pie", 
-            autopct="%1.1f%%", 
+            kind="pie",
+            autopct="%1.1f%%",
             title="Distribution of Violations by Category"
         )
         plt.ylabel("")
         plt.tight_layout()
         plt.show()
-
-
-
-if __name__ == "__main__":
-    checker = PrivacyChecker("prompts/privacy-checker/sample1.txt", debug=False)
-    checker.run()
-    checker.generate_report()
